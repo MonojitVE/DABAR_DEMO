@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DABAR — Personal Finance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0b0e13;
+      --bg2:       #111520;
+      --bg3:       #181d2b;
+      --border:    rgba(255,255,255,0.07);
+      --accent:    #d4f54e;
+      --accent2:   #5af5b8;
+      --accent3:   #f5a84e;
+      --red:       #f55a5a;
+      --text:      #e8ecf4;
+      --muted:     #6b7280;
+      --card-glow: rgba(212,245,78,0.06);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── NOISE OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.4;
+    }
+
+    /* ── GRID BACKGROUND ── */
+    .grid-bg {
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── LAYOUT ── */
+    .shell {
+      position: relative;
+      z-index: 1;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px 60px;
+    }
+
+    /* ── HEADER ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 28px 0 40px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 40px;
+    }
+
+    .logo {
+      font-family: 'Syne', sans-serif;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+
+    .logo span {
+      color: var(--text);
+      opacity: 0.35;
+    }
+
+    .header-meta {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: right;
+      line-height: 1.8;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      background: var(--accent2);
+      border-radius: 50%;
+      margin-right: 6px;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%,100% { opacity:1; transform: scale(1); }
+      50% { opacity:.4; transform: scale(0.8); }
+    }
+
+    /* ── SECTION LABELS ── */
+    .section-label {
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── KPI CARDS ── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 40px;
+    }
+
+    @media (max-width: 768px) {
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .kpi-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px 20px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color .25s, transform .2s;
+      animation: fadeUp .5s ease both;
+    }
+
+    .kpi-card:hover {
+      border-color: rgba(255,255,255,0.15);
+      transform: translateY(-2px);
+    }
+
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--card-glow);
+      opacity: 0;
+      transition: opacity .3s;
+    }
+    .kpi-card:hover::before { opacity: 1; }
+
+    .kpi-card.income { --card-glow: rgba(90,245,184,0.07); }
+    .kpi-card.expense { --card-glow: rgba(245,90,90,0.07); }
+    .kpi-card.balance { --card-glow: rgba(212,245,78,0.1); }
+    .kpi-card.top-cat { --card-glow: rgba(245,168,78,0.07); }
+
+    .kpi-label {
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .kpi-value {
+      font-family: 'Syne', sans-serif;
+      font-size: 26px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .kpi-card.income  .kpi-value { color: var(--accent2); }
+    .kpi-card.expense .kpi-value { color: var(--red); }
+    .kpi-card.balance .kpi-value { color: var(--accent); }
+    .kpi-card.top-cat .kpi-value { color: var(--accent3); font-size: 18px; }
+
+    .kpi-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    .kpi-icon {
+      position: absolute;
+      top: 18px; right: 18px;
+      font-size: 20px;
+      opacity: 0.2;
+    }
+
+    /* ── MAIN 2-COL ── */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+
+    @media (max-width: 900px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── PANEL ── */
+    .panel {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      animation: fadeUp .6s ease both;
+    }
+
+    .panel-head {
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .panel-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+
+    .panel-badge {
+      font-size: 10px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      padding: 3px 10px;
+      border-radius: 20px;
+      color: var(--muted);
+    }
+
+    /* ── TRANSACTION TABLE ── */
+    .tx-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .tx-table th {
+      padding: 12px 22px;
+      text-align: left;
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      font-weight: 400;
+    }
+
+    .tx-table td {
+      padding: 14px 22px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    .tx-table tr:last-child td { border-bottom: none; }
+
+    .tx-table tr {
+      transition: background .15s;
+    }
+    .tx-table tr:hover td { background: rgba(255,255,255,0.025); }
+
+    .tx-desc {
+      font-weight: 500;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .tx-date {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .tx-source-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .tx-cat-chip {
+      display: inline-flex;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .tx-amount {
+      font-family: 'Syne', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .tx-amount.positive { color: var(--accent2); }
+    .tx-amount.negative { color: var(--red); }
+
+    .cat-Income    { background: rgba(90,245,184,0.1);  color: var(--accent2); }
+    .cat-Housing   { background: rgba(245,90,90,0.1);   color: var(--red); }
+    .cat-Food      { background: rgba(245,168,78,0.1);  color: var(--accent3); }
+    .cat-Utilities { background: rgba(100,160,255,0.1); color: #87a8ff; }
+
+    /* ── CATEGORY BREAKDOWN ── */
+    .breakdown-list {
+      padding: 20px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .bk-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .bk-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .bk-name {
+      font-weight: 500;
+    }
+
+    .bk-amount {
+      color: var(--muted);
+    }
+
+    .bk-bar-track {
+      height: 5px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .bk-bar-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 1s cubic-bezier(.22,.61,.36,1);
+    }
+
+    /* ── AI CHAT ── */
+    .ai-section {
+      animation: fadeUp .7s ease both;
+    }
+
+    .ai-panel {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .ai-messages {
+      padding: 20px 22px;
+      min-height: 200px;
+      max-height: 360px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .ai-messages::-webkit-scrollbar { width: 4px; }
+    .ai-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 2px; }
+
+    .msg {
+      display: flex;
+      gap: 12px;
+      animation: fadeUp .3s ease;
+    }
+
+    .msg-avatar {
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+    }
+
+    .msg.user .msg-avatar  { background: rgba(212,245,78,0.15); }
+    .msg.ai   .msg-avatar  { background: rgba(90,245,184,0.12); }
+
+    .msg-bubble {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 13px;
+      line-height: 1.65;
+      max-width: 85%;
+    }
+
+    .msg.user .msg-bubble {
+      background: rgba(212,245,78,0.07);
+      border-color: rgba(212,245,78,0.15);
+    }
+
+    .ai-input-row {
+      display: flex;
+      gap: 10px;
+      padding: 14px 16px;
+      border-top: 1px solid var(--border);
+      background: var(--bg3);
+    }
+
+    .ai-input {
+      flex: 1;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      outline: none;
+      transition: border-color .2s;
+    }
+
+    .ai-input:focus { border-color: rgba(212,245,78,0.35); }
+    .ai-input::placeholder { color: var(--muted); }
+
+    .ai-send-btn {
+      background: var(--accent);
+      color: #0b0e13;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-family: 'Syne', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: opacity .2s, transform .15s;
+      white-space: nowrap;
+    }
+
+    .ai-send-btn:hover { opacity: .85; transform: scale(0.98); }
+    .ai-send-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+    /* ── LOADER DOT ── */
+    .typing-dots {
+      display: flex; gap: 5px; align-items: center; padding: 4px 0;
+    }
+    .typing-dots span {
+      width: 6px; height: 6px;
+      background: var(--accent2);
+      border-radius: 50%;
+      animation: bounce 1.2s infinite;
+    }
+    .typing-dots span:nth-child(2) { animation-delay: .2s; }
+    .typing-dots span:nth-child(3) { animation-delay: .4s; }
+
+    @keyframes bounce {
+      0%,80%,100% { transform: translateY(0); }
+      40% { transform: translateY(-6px); }
+    }
+
+    /* ── ERROR BANNER ── */
+    .error-banner {
+      background: rgba(245,90,90,0.1);
+      border: 1px solid rgba(245,90,90,0.3);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 12px;
+      color: var(--red);
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .error-banner.show { display: block; }
+
+    /* ── SKELETON ── */
+    .skeleton {
+      background: linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.09) 50%, rgba(255,255,255,.04) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 6px;
+    }
+
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .kpi-card:nth-child(1) { animation-delay: .05s; }
+    .kpi-card:nth-child(2) { animation-delay: .1s; }
+    .kpi-card:nth-child(3) { animation-delay: .15s; }
+    .kpi-card:nth-child(4) { animation-delay: .2s; }
+
+    /* ── EMPTY STATE ── */
+    .empty-msg {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    /* ── SOURCE DOTS ── */
+    .src-Bank    { background: #5af5b8; }
+    .src-Digital { background: var(--accent); }
+    .src-Mobile  { background: #87a8ff; }
+
+    .src-dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      margin-right: 4px;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px 0 0;
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    /* ── CONNECTION STATUS ── */
+    .conn-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+    }
+
+    .conn-badge.connected { color: var(--accent2); border-color: rgba(90,245,184,.25); }
+    .conn-badge.disconnected { color: var(--red); border-color: rgba(245,90,90,.25); }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+
+<div class="shell">
+
+  <!-- HEADER -->
+  <header>
+    <div>
+      <div class="logo">DABAR <span>/ Finance</span></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">Unified financial data layer</div>
+    </div>
+    <div class="header-meta">
+      <div><span class="status-dot"></span>Live data sync</div>
+      <div id="last-updated">Connecting...</div>
+      <div id="conn-status" class="conn-badge disconnected" style="margin-top:6px;display:inline-flex">
+        <span>●</span> <span id="conn-text">Offline</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ERROR BANNER -->
+  <div class="error-banner" id="error-banner">
+    ⚠ Backend unreachable at <strong>http://localhost:8000</strong>. Make sure your FastAPI server is running: <code>uvicorn main:app --reload</code>
+  </div>
+
+  <!-- KPI CARDS -->
+  <div class="section-label">Overview</div>
+  <div class="kpi-grid" id="kpi-grid">
+    <div class="kpi-card income">
+      <div class="kpi-icon">↑</div>
+      <div class="kpi-label">Total Income</div>
+      <div class="kpi-value" id="kpi-income"><span class="skeleton" style="display:block;width:80px;height:28px"></span></div>
+      <div class="kpi-sub" id="kpi-income-sub">&nbsp;</div>
+    </div>
+    <div class="kpi-card expense">
+      <div class="kpi-icon">↓</div>
+      <div class="kpi-label">Total Expenses</div>
+      <div class="kpi-value" id="kpi-expense"><span class="skeleton" style="display:block;width:80px;height:28px"></span></div>
+      <div class="kpi-sub" id="kpi-expense-sub">&nbsp;</div>
+    </div>
+    <div class="kpi-card balance">
+      <div class="kpi-icon">◈</div>
+      <div class="kpi-label">Net Balance</div>
+      <div class="kpi-value" id="kpi-balance"><span class="skeleton" style="display:block;width:80px;height:28px"></span></div>
+      <div class="kpi-sub" id="kpi-balance-sub">&nbsp;</div>
+    </div>
+    <div class="kpi-card top-cat">
+      <div class="kpi-icon">⊛</div>
+      <div class="kpi-label">Top Expense</div>
+      <div class="kpi-value" id="kpi-topcat"><span class="skeleton" style="display:block;width:80px;height:28px"></span></div>
+      <div class="kpi-sub">highest category spend</div>
+    </div>
+  </div>
+
+  <!-- MAIN GRID: Transactions + Breakdown -->
+  <div class="section-label">Activity</div>
+  <div class="main-grid">
+
+    <!-- TRANSACTIONS -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">Transactions</span>
+        <span class="panel-badge" id="tx-count">— entries</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="tx-table">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th>Category</th>
+              <th>Source</th>
+              <th style="text-align:right">Amount</th>
+            </tr>
+          </thead>
+          <tbody id="tx-body">
+            <tr><td colspan="4" class="empty-msg">Loading transactions...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CATEGORY BREAKDOWN -->
+    <div class="panel" style="align-self:start">
+      <div class="panel-head">
+        <span class="panel-title">Category Breakdown</span>
+        <span class="panel-badge">expenses</span>
+      </div>
+      <div class="breakdown-list" id="breakdown-list">
+        <div style="padding:20px 0;text-align:center;color:var(--muted)">Loading...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- AI CHAT -->
+  <div class="section-label">AI Assistant</div>
+  <div class="ai-section">
+    <div class="ai-panel">
+      <div class="panel-head">
+        <span class="panel-title">Ask about your finances</span>
+        <span class="panel-badge">powered by Claude</span>
+      </div>
+
+      <div class="ai-messages" id="ai-messages">
+        <div class="msg ai">
+          <div class="msg-avatar">◈</div>
+          <div class="msg-bubble">
+            Hey! I have access to your financial data. Ask me anything — savings tips, spending analysis, or budgeting advice.
+          </div>
+        </div>
+      </div>
+
+      <div class="ai-input-row">
+        <input
+          class="ai-input"
+          id="ai-input"
+          type="text"
+          placeholder="e.g. How can I save more this month?"
+          autocomplete="off"
+        />
+        <button class="ai-send-btn" id="ai-send">Ask →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <span>DABAR v0.1 — Demo</span>
+    <span>backend: localhost:8000</span>
+  </footer>
+
+</div>
+
+<script>
+  const API = 'http://localhost:8000';
+
+  /* ── UTILS ── */
+  const fmt = (n) => '₹' + Math.abs(n).toLocaleString('en-IN');
+
+  function srcClass(src) {
+    if (src.includes('Bank'))    return 'src-Bank';
+    if (src.includes('Digital')) return 'src-Digital';
+    return 'src-Mobile';
+  }
+
+  function catClass(cat) {
+    return 'cat-' + cat;
+  }
+
+  function setConnected(ok) {
+    const badge = document.getElementById('conn-status');
+    const text  = document.getElementById('conn-text');
+    badge.className = 'conn-badge ' + (ok ? 'connected' : 'disconnected');
+    text.textContent = ok ? 'Connected' : 'Offline';
+  }
+
+  function showError(show) {
+    document.getElementById('error-banner').classList.toggle('show', show);
+  }
+
+  function animCount(el, target) {
+    const dur = 800, start = performance.now();
+    const from = 0;
+    function step(now) {
+      const p = Math.min((now - start) / dur, 1);
+      const ease = 1 - Math.pow(1 - p, 3);
+      el.textContent = '₹' + Math.round(from + (target - from) * ease).toLocaleString('en-IN');
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  /* ── LOAD DASHBOARD ── */
+  async function loadDashboard() {
+    try {
+      const res = await fetch(`${API}/dashboard`);
+      if (!res.ok) throw new Error();
+      const d = await res.json();
+      setConnected(true);
+      showError(false);
+
+      document.getElementById('last-updated').textContent =
+        'Updated ' + new Date().toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'});
+
+      // KPIs
+      const incEl = document.getElementById('kpi-income');
+      const expEl = document.getElementById('kpi-expense');
+      const balEl = document.getElementById('kpi-balance');
+      incEl.innerHTML = '₹0'; expEl.innerHTML = '₹0'; balEl.innerHTML = '₹0';
+      animCount(incEl, d.total_income);
+      animCount(expEl, d.total_expenses);
+      animCount(balEl, d.balance);
+      document.getElementById('kpi-income-sub').textContent  = 'across all sources';
+      document.getElementById('kpi-expense-sub').textContent = d.category_breakdown ? Object.keys(d.category_breakdown).length + ' categories' : '';
+      document.getElementById('kpi-balance-sub').textContent = d.balance >= 0 ? 'surplus this period' : 'deficit this period';
+      document.getElementById('kpi-topcat').textContent      = d.top_expense_category;
+
+      // Breakdown bars
+      const breakdown = d.category_breakdown || {};
+      const maxVal = Math.max(...Object.values(breakdown));
+      const barColors = {
+        Housing: '#f55a5a',
+        Food: '#f5a84e',
+        Utilities: '#87a8ff',
+      };
+      const bl = document.getElementById('breakdown-list');
+      bl.innerHTML = '';
+      Object.entries(breakdown)
+        .sort((a,b) => b[1]-a[1])
+        .forEach(([cat, amt]) => {
+          const pct = Math.round((amt / maxVal) * 100);
+          const color = barColors[cat] || '#5af5b8';
+          bl.innerHTML += `
+            <div class="bk-row">
+              <div class="bk-meta">
+                <span class="bk-name">${cat}</span>
+                <span class="bk-amount">${fmt(amt)}</span>
+              </div>
+              <div class="bk-bar-track">
+                <div class="bk-bar-fill" style="width:0%;background:${color}" data-target="${pct}"></div>
+              </div>
+            </div>`;
+        });
+
+      // Animate bars after paint
+      setTimeout(() => {
+        document.querySelectorAll('.bk-bar-fill').forEach(el => {
+          el.style.width = el.dataset.target + '%';
+        });
+      }, 80);
+
+    } catch {
+      setConnected(false);
+      showError(true);
+    }
+  }
+
+  /* ── LOAD TRANSACTIONS ── */
+  async function loadTransactions() {
+    try {
+      const res = await fetch(`${API}/transactions`);
+      if (!res.ok) throw new Error();
+      const txs = await res.json();
+      const tbody = document.getElementById('tx-body');
+      document.getElementById('tx-count').textContent = txs.length + ' entries';
+      tbody.innerHTML = '';
+      txs.forEach((t, i) => {
+        const isPos = t.amount > 0;
+        const srcKey = t.source.split(' ')[0];
+        tbody.innerHTML += `
+          <tr style="animation:fadeUp .35s ease ${i*0.05}s both">
+            <td>
+              <div class="tx-desc">${t.description}</div>
+              <div class="tx-date">${t.date}</div>
+            </td>
+            <td><span class="tx-cat-chip ${catClass(t.category)}">${t.category}</span></td>
+            <td>
+              <span class="tx-source-chip">
+                <span class="src-dot ${srcClass(t.source)}"></span>
+                ${t.source}
+              </span>
+            </td>
+            <td>
+              <div class="tx-amount ${isPos ? 'positive' : 'negative'}">
+                ${isPos ? '+' : '−'} ${fmt(t.amount)}
+              </div>
+            </td>
+          </tr>`;
+      });
+    } catch {
+      document.getElementById('tx-body').innerHTML =
+        '<tr><td colspan="4" class="empty-msg">Could not load transactions.</td></tr>';
+    }
+  }
+
+  /* ── AI CHAT ── */
+  const messagesEl = document.getElementById('ai-messages');
+  const inputEl    = document.getElementById('ai-input');
+  const sendBtn    = document.getElementById('ai-send');
+
+  function appendMsg(role, html) {
+    const div = document.createElement('div');
+    div.className = 'msg ' + role;
+    div.innerHTML = `
+      <div class="msg-avatar">${role === 'user' ? '◉' : '◈'}</div>
+      <div class="msg-bubble">${html}</div>`;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return div;
+  }
+
+  async function sendMessage() {
+    const q = inputEl.value.trim();
+    if (!q) return;
+    inputEl.value = '';
+    sendBtn.disabled = true;
+
+    appendMsg('user', q);
+
+    // Typing indicator
+    const typingDiv = appendMsg('ai', '<div class="typing-dots"><span></span><span></span><span></span></div>');
+
+    try {
+      const res = await fetch(`${API}/ai-chat`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ question: q })
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      typingDiv.querySelector('.msg-bubble').innerHTML = data.answer.replace(/\n/g, '<br>');
+    } catch {
+      typingDiv.querySelector('.msg-bubble').innerHTML =
+        '<span style="color:var(--red)">Could not reach the AI backend. Make sure the server is running.</span>';
+    } finally {
+      sendBtn.disabled = false;
+      inputEl.focus();
+    }
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  inputEl.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
+
+  /* ── INIT ── */
+  loadDashboard();
+  loadTransactions();
+</script>
+</body>
+</html>
