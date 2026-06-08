@@ -8,7 +8,7 @@ app = FastAPI()
 
 app.add_middleware(
 CORSMiddleware,
-allow_origins=["*"], # For demo purposes
+allow_origins=["https://dabar-demo.vercel.app/"], # For demo purposes
 allow_credentials=True,
 allow_methods=["*"],
 allow_headers=["*"],
