@@ -1061,6 +1061,50 @@
         messagesEl.scrollTop = messagesEl.scrollHeight;
         return div;
       }
+      function renderMarkdown(text) {
+        return (
+          text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            // Headers
+            .replace(
+              /^### (.+)$/gm,
+              '<h4 style="font-family:Syne,sans-serif;font-size:12px;color:var(--text);margin:10px 0 4px;letter-spacing:.05em">$1</h4>',
+            )
+            .replace(
+              /^## (.+)$/gm,
+              '<h3 style="font-family:Syne,sans-serif;font-size:13px;color:var(--accent);margin:12px 0 5px;letter-spacing:.05em">$1</h3>',
+            )
+            .replace(
+              /^# (.+)$/gm,
+              '<h2 style="font-family:Syne,sans-serif;font-size:15px;color:var(--accent);margin:0 0 10px;letter-spacing:.05em">$1</h2>',
+            )
+            // Bold
+            .replace(
+              /\*\*(.+?)\*\*/g,
+              '<strong style="color:var(--text)">$1</strong>',
+            )
+            // Bullet lists
+            .replace(
+              /^\s*[-*] (.+)$/gm,
+              '<li style="margin:3px 0;padding-left:4px">$1</li>',
+            )
+            .replace(/(<li[\s\S]*?<\/li>)(?=\s*<li|\s*$)/g, (m) =>
+              m.includes("<ul")
+                ? m
+                : `<ul style="padding-left:18px;margin:6px 0;list-style:none">${m}</ul>`,
+            )
+            // Numbered lists
+            .replace(
+              /^\d+\. (.+)$/gm,
+              '<li style="margin:4px 0;padding-left:4px">$1</li>',
+            )
+            // Line breaks
+            .replace(/\n{2,}/g, '<div style="height:8px"></div>')
+            .replace(/\n/g, "<br>")
+        );
+      }
 
       async function sendMessage() {
         const q = inputEl.value.trim();
@@ -1084,8 +1128,9 @@
           });
           if (!res.ok) throw new Error();
           const data = await res.json();
-          typingDiv.querySelector(".msg-bubble").innerHTML =
-            data.answer.replace(/\n/g, "<br>");
+          typingDiv.querySelector(".msg-bubble").innerHTML = renderMarkdown(
+            data.answer,
+          );
         } catch {
           typingDiv.querySelector(".msg-bubble").innerHTML =
             '<span style="color:var(--red)">Could not reach the AI backend. Make sure the server is running.</span>';
